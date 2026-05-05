@@ -2,7 +2,7 @@ import { ref, readonly } from 'vue'
 import { getAppUser } from '@/services/supabase'
 
 const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME ?? 'admin'
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD ?? 'Gama0000'
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD ?? ''
 const SESSION_KEY    = 'jira_assessment_session'
 
 const session = ref(loadSession())
