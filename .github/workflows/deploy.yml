@@ -1,0 +1,34 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL:    ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON:   ${{ secrets.VITE_SUPABASE_ANON }}
+          VITE_ADMIN_USERNAME:  ${{ secrets.VITE_ADMIN_USERNAME }}
+          VITE_ADMIN_PASSWORD:  ${{ secrets.VITE_ADMIN_PASSWORD }}
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

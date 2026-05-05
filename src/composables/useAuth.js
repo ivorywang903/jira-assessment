@@ -1,8 +1,8 @@
 import { ref, readonly } from 'vue'
 import { getAppUser } from '@/services/supabase'
 
-const ADMIN_USERNAME = 'admin'
-const ADMIN_PASSWORD_HASH = await sha256('Gama0000')
+const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME ?? 'admin'
+const ADMIN_PASSWORD_HASH = await sha256(import.meta.env.VITE_ADMIN_PASSWORD ?? 'Gama0000')
 const SESSION_KEY = 'jira_assessment_session'
 
 // role: 'admin' | 'user' | null
