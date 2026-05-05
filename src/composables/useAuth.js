@@ -2,10 +2,9 @@ import { ref, readonly } from 'vue'
 import { getAppUser } from '@/services/supabase'
 
 const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME ?? 'admin'
-const ADMIN_PASSWORD_HASH = await sha256(import.meta.env.VITE_ADMIN_PASSWORD ?? 'Gama0000')
-const SESSION_KEY = 'jira_assessment_session'
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD ?? 'Gama0000'
+const SESSION_KEY    = 'jira_assessment_session'
 
-// role: 'admin' | 'user' | null
 const session = ref(loadSession())
 
 function loadSession() {
@@ -29,16 +28,15 @@ function saveSession(data) {
 export async function login(username, password) {
   const hashed = await sha256(password)
 
-  // admin 帳號（硬編碼）
   if (username === ADMIN_USERNAME) {
-    if (hashed === ADMIN_PASSWORD_HASH) {
+    const adminHash = await sha256(ADMIN_PASSWORD)
+    if (hashed === adminHash) {
       saveSession({ username, role: 'admin' })
       return { success: true, role: 'admin' }
     }
     return { success: false, error: '帳號或密碼錯誤' }
   }
 
-  // app_user（查 Supabase）
   const user = await getAppUser(username)
   if (!user) return { success: false, error: '帳號或密碼錯誤' }
   if (user.token !== hashed) return { success: false, error: '帳號或密碼錯誤' }
@@ -55,8 +53,8 @@ export function useAuth() {
   return {
     session: readonly(session),
     isLoggedIn: () => !!session.value,
-    isAdmin: () => session.value?.role === 'admin',
-    isUser: () => session.value?.role === 'user',
+    isAdmin:    () => session.value?.role === 'admin',
+    isUser:     () => session.value?.role === 'user',
   }
 }
 
