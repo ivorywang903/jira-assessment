@@ -5,6 +5,31 @@ on:
     branches: [main]
 
 jobs:
+  readme-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check README updated
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          NEEDS_README=$(echo "$CHANGED" | grep -E '^(src/|supabase/migrations/|\.github/workflows/|\.env\.example)' || true)
+          README_CHANGED=$(echo "$CHANGED" | grep '^README.md' || true)
+
+          if [ -n "$NEEDS_README" ] && [ -z "$README_CHANGED" ]; then
+            echo "::warning::下列檔案有異動但 README.md 未更新，請確認是否需要補充說明："
+            echo "$NEEDS_README" | while read f; do echo "::warning::  - $f"; done
+          else
+            echo "README check passed."
+          fi
+
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
