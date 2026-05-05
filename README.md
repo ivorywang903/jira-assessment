@@ -32,6 +32,23 @@ AND "End date" >= "{StartDate}" AND "End date" <= "{EndDate}"
 ORDER BY cf[12000] DESC, updated ASC, cf[10502] ASC, key ASC
 ```
 
+### 查詢期間
+
+Dashboard 提供三個預設期間（依當年度自動計算）加自訂日期：
+
+| 期間 | 日期範圍 |
+|------|---------|
+| 第一期 | 01/01 – 04/30 |
+| 第二期 | 05/01 – 08/31 |
+| 第三期 | 09/01 – 12/31 |
+| 自訂 | 任意起迄日期 |
+
+### 分析結果快取
+
+- 點「開始分析」時，若 Supabase 中已有該期間所有成員的記錄，直接從 DB 載入，不重新呼叫 Jira API
+- 頁面顯示「資料來自快取」提示，並出現「**重新抓取**」按鈕
+- 按「重新抓取」才會重新呼叫 Jira / Bitbucket，並覆蓋 DB 中的舊記錄
+
 ### 異常單（Delay）分析
 
 - **定義**：Implement → RD TEST 超過 **10 個工作天**自動標記
@@ -70,16 +87,22 @@ cd jira-assessment
 npm install
 ```
 
-### 2. 設定環境變數（選用）
-
-若需要持久化考核紀錄至 Supabase：
+### 2. 設定環境變數
 
 ```bash
 cp .env.example .env
-# 填入 VITE_SUPABASE_URL 與 VITE_SUPABASE_ANON
 ```
 
-> 不設定 Supabase 仍可正常使用，連線設定以 `localStorage` 暫存。
+`.env` 各項說明：
+
+| 變數 | 必填 | 說明 |
+|------|------|------|
+| `VITE_ADMIN_PASSWORD` | **必填** | admin 帳號的登入密碼 |
+| `VITE_ADMIN_USERNAME` | 選填 | admin 帳號名稱（預設 `admin`） |
+| `VITE_SUPABASE_URL` | 選填 | Supabase 專案 URL，不填則無法持久化記錄 |
+| `VITE_SUPABASE_ANON` | 選填 | Supabase anon key |
+
+> `VITE_ADMIN_PASSWORD` 未設定時 admin 無法登入。
 
 ### 3. 啟動開發伺服器
 
@@ -124,9 +147,11 @@ npm run build
 ## 使用說明
 
 1. 至 **Dashboard** 頁面
-2. 選擇查詢的**日期範圍**（起始日的年份決定台灣行事曆資料）
+2. 選擇**查詢期間**（第一期 / 第二期 / 第三期 / 自訂）
 3. 勾選要分析的**成員**
-4. 點「**開始分析**」，等待進度條跑完
+4. 點「**開始分析**」
+   - 有快取 → 直接顯示，可按「重新抓取」強制更新
+   - 無快取 → 呼叫 Jira / Bitbucket API 分析，完成後存入 DB
 5. 查看：
    - 統計卡片（總票數、超時數、非人為延遲數）
    - 綜合排名表（含各分項分數）
@@ -146,9 +171,30 @@ npm run build
 
 ---
 
+## CI / CD（GitHub Actions）
+
+推送到 `main` 分支時自動執行：
+
+1. 安裝依賴、Build 檢查
+2. 以 Supabase CLI `2.90.0` 連結專案並推送 DB migrations
+
+需在 GitHub → Settings → Secrets and variables → Actions 設定以下 Secrets：
+
+| Secret | 說明 |
+|--------|------|
+| `VITE_SUPABASE_URL` | Supabase 專案 URL |
+| `VITE_SUPABASE_ANON` | Supabase anon key |
+| `VITE_ADMIN_USERNAME` | admin 帳號名稱 |
+| `VITE_ADMIN_PASSWORD` | admin 登入密碼 |
+| `SUPABASE_PROJECT_ID` | Supabase 專案 Reference ID |
+| `SUPABASE_ACCESS_TOKEN` | Supabase Personal Access Token |
+| `SUPABASE_DB_PASSWORD` | Supabase 資料庫密碼 |
+
+---
+
 ## 資料庫 Schema（Supabase）
 
-執行 `supabase/schema.sql` 建立以下三張表：
+執行 `supabase/migrations/` 下的 migration 檔案建立以下三張表：
 
 | 表名 | 說明 |
 |------|------|
@@ -162,8 +208,13 @@ npm run build
 
 ```
 jira-assessment/
+├── .github/workflows/
+│   └── deploy.yml               # CI：Build 檢查 + Supabase migration
 ├── supabase/
-│   └── schema.sql
+│   ├── config.toml
+│   ├── schema.sql               # 人類閱讀用 schema 參考
+│   └── migrations/
+│       └── 20260101000000_init.sql
 ├── src/
 │   ├── services/
 │   │   ├── workday.js           # 台灣工作日計算
@@ -173,7 +224,7 @@ jira-assessment/
 │   │   ├── rankingCalculator.js # 綜合排名演算法
 │   │   └── supabase.js          # Supabase CRUD
 │   ├── composables/
-│   │   ├── useAssessment.js     # 主分析流程
+│   │   ├── useAssessment.js     # 主分析流程（含快取邏輯）
 │   │   ├── useConfig.js         # 連線設定管理
 │   │   └── useAuth.js           # 登入 / 登出 / Session
 │   ├── components/
@@ -198,3 +249,4 @@ jira-assessment/
 - 票據量大時（>200 張）分析時間較長，進度條會即時更新目前處理狀態
 - 台灣行事曆資料依起始日年份自動載入，跨年查詢會同時載入兩年資料
 - Bitbucket PR 與 Jira 票據的關聯透過 `filterText`（branch / PR title 含 Jira Key）比對，命名不規範的 PR 可能無法正確關聯
+- 原始碼不包含任何預設憑證，所有帳密均須透過環境變數或 Supabase 設定
